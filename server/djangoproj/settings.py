@@ -22,14 +22,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY =\
+SECRET_KEY = \
     'django-insecure-ccow$tz_=9%dxu4(0%^(z%nx32#s@(zt9$ih@)5l54yny)wm-0'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-CSRF_TRUSTED_ORIGINS = []
+# Replace '<your-application-url>' with your actual environment URL (without trailing slash)
+ALLOWED_HOSTS = [
+    "localhost",
+    "akashjordan3-8000.theianext-1-labs-prod-misc-tools-us-east-0.proxy.cognitiveclass.ai",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://akashjordan3-8000.theianext-1-labs-prod-misc-tools-us-east-0.proxy.cognitiveclass.ai",
+]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
@@ -61,7 +68,9 @@ ROOT_URLCONF = 'djangoproj.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            os.path.join(BASE_DIR, 'frontend/static'),
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -134,5 +143,6 @@ MEDIA_URL = '/media/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-STATICFILES_DIRS = []
-
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'frontend/static'),
+]
