@@ -1,13 +1,10 @@
 from django.shortcuts import render
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, JsonResponse
 from django.contrib.auth.models import User
-from django.shortcuts import get_object_or_404, render, redirect
-from django.contrib.auth import logout
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib.auth import logout, login, authenticate
 from django.contrib import messages
 from datetime import datetime
-
-from django.http import JsonResponse
-from django.contrib.auth import login, authenticate
 import logging
 import json
 from django.views.decorators.csrf import csrf_exempt
@@ -16,12 +13,13 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import CarMake, CarModel
 from .populate import initiate
 
+# Import helper functions from restapis
+from .restapis import get_request, analyze_review_sentiments, post_review
+
 
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
 
-
-# Create your views here.
 
 # Create a `login_request` view to handle sign in request
 @csrf_exempt
@@ -67,7 +65,7 @@ def registration(request):
         # Check if user already exists
         User.objects.get(username=username)
         username_exist = True
-    except:
+    except User.DoesNotExist:
         # If not, simply log this is a new user
         logger.debug("{} is new user".format(username))
 
@@ -103,19 +101,52 @@ def get_cars(request):
     return JsonResponse({"CarModels": cars})
 
 
-# # Update the `get_dealerships` view to render the index page with
-# a list of dealerships
-# def get_dealerships(request):
-# ...
+# Update the `get_dealerships` view to render list of dealerships
+def get_dealerships(request, state="All"):
+    if state == "All":
+        endpoint = "/fetchDealers"
+    else:
+        endpoint = "/fetchDealers/" + state
+    dealerships = get_request(endpoint)
+    return JsonResponse({"status": 200, "dealers": dealerships})
 
-# Create a `get_dealer_reviews` view to render the reviews of a dealer
-# def get_dealer_reviews(request,dealer_id):
-# ...
 
-# Create a `get_dealer_details` view to render the dealer details
-# def get_dealer_details(request, dealer_id):
-# ...
+# Create a `get_dealer_details` view to render dealer details by ID
+def get_dealer_details(request, dealer_id):
+    if dealer_id:
+        endpoint = "/fetchDealer/" + str(dealer_id)
+        dealership = get_request(endpoint)
+        return JsonResponse({"status": 200, "dealer": dealership})
+    else:
+        return JsonResponse({"status": 400, "message": "Bad Request"})
 
-# Create a `add_review` view to submit a review
-# def add_review(request):
-# ...
+
+# Create a `get_dealer_reviews` view to render reviews of a dealer with sentiment
+def get_dealer_reviews(request, dealer_id):
+    if dealer_id:
+        endpoint = "/fetchReviews/dealer/" + str(dealer_id)
+        reviews = get_request(endpoint)
+        if reviews:
+            for review_detail in reviews:
+                response = analyze_review_sentiments(review_detail['review'])
+                if response and 'sentiment' in response:
+                    review_detail['sentiment'] = response['sentiment']
+                else:
+                    review_detail['sentiment'] = "neutral"
+        return JsonResponse({"status": 200, "reviews": reviews})
+    else:
+        return JsonResponse({"status": 400, "message": "Bad Request"})
+
+
+# Create an `add_review` view to submit a review
+@csrf_exempt
+def add_review(request):
+    if not request.user.is_anonymous:
+        data = json.loads(request.body)
+        try:
+            response = post_review(data)
+            return JsonResponse({"status": 200})
+        except Exception as err:
+            return JsonResponse({"status": 401, "message": "Error in posting review"})
+    else:
+        return JsonResponse({"status": 403, "message": "Unauthorized"})
