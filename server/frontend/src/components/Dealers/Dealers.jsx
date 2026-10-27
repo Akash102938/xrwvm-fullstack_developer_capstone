@@ -1,64 +1,90 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import "./Dealers.css";
 import "../assets/style.css";
 import Header from '../Header/Header';
 
-const Dealer = () => {
-  const [dealer, setDealer] = useState({ full_name: "Loading...", city: "", address: "", zip: "", state: "" });
-  const [reviews, setReviews] = useState([]);
-  
-  const { id } = useParams();
-  const base_url = window.location.origin;
+const Dealers = () => {
+  const [dealers, setDealers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    async function fetchData() {
+    let cancelled = false;
+
+    const fetchDealers = async () => {
       try {
-        // Fetch dealer details
-        const dealerRes = await fetch(`${base_url}/djangoapp/dealer/${id}`);
-        const dealerObj = await dealerRes.json();
-        if (dealerObj.status === 200 && dealerObj.dealer) {
-          const dData = Array.isArray(dealerObj.dealer) ? dealerObj.dealer[0] : dealerObj.dealer;
-          setDealer(dData);
+        const response = await fetch(`${window.location.origin}/djangoapp/get_dealers`);
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
 
-        // Fetch reviews
-        const reviewRes = await fetch(`${base_url}/djangoapp/reviews/dealer/${id}`);
-        const reviewObj = await reviewRes.json();
-        if (reviewObj.status === 200 && reviewObj.reviews) {
-          setReviews(reviewObj.reviews);
+        const result = await response.json();
+        if (result.status !== 200 || !Array.isArray(result.dealers)) {
+          throw new Error("The dealerships response had an unexpected format.");
         }
-      } catch (err) {
-        console.error("Error fetching data:", err);
+
+        if (!cancelled) {
+          setDealers(result.dealers);
+        }
+      } catch (fetchError) {
+        console.error("Error fetching dealerships:", fetchError);
+        if (!cancelled) {
+          setError("Unable to load dealerships. Please try again later.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    }
-    fetchData();
-  }, [id, base_url]);
+    };
+
+    fetchDealers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div style={{ margin: "20px" }}>
       <Header />
-      <div style={{ marginTop: "20px" }}>
-        <h1 style={{ color: "#333" }}>{dealer.full_name || `Dealer #${id}`}</h1>
-        <h4 style={{ color: "#666" }}>
-          {dealer.city}, {dealer.address} - {dealer.zip}, {dealer.state}
-        </h4>
-      </div>
-      <div className="reviews_panel" style={{ marginTop: "20px" }}>
-        <h3>Reviews</h3>
-        {reviews.length === 0 ? (
-          <div>No reviews yet for this dealer!</div>
-        ) : (
-          reviews.map((review, index) => (
-            <div className='review_panel' key={index} style={{ border: "1px solid #ccc", padding: "10px", margin: "10px 0" }}>
-              <div className='review'><strong>Review:</strong> {review.review}</div>
-              <div className="reviewer"><strong>User:</strong> {review.name} | <strong>Car:</strong> {review.car_make} {review.car_model} ({review.car_year})</div>
-            </div>
-          ))
-        )}
-      </div>
+      <h1 style={{ color: "grey", marginTop: "20px" }}>Dealers</h1>
+      {loading ? (
+        <p>Loading dealerships...</p>
+      ) : error ? (
+        <p role="alert">{error}</p>
+      ) : dealers.length === 0 ? (
+        <p>No dealerships found.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Dealer</th>
+              <th>City</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dealers.map((dealer) => (
+              <tr key={dealer.id}>
+                <td>
+                  {dealer.id !== undefined && dealer.id !== null ? (
+                    <Link to={`/dealer/${dealer.id}`}>
+                      {dealer.full_name || dealer.short_name || dealer.name || `Dealer #${dealer.id}`}
+                    </Link>
+                  ) : (
+                    dealer.full_name || dealer.short_name || dealer.name || "Dealer"
+                  )}
+                </td>
+                <td>{dealer.city || ""}</td>
+                <td>{dealer.state || dealer.st || ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 };
 
-export default Dealer;
+export default Dealers;
