@@ -20,23 +20,23 @@ from .restapis import get_request, analyze_review_sentiments, post_review
 logger = logging.getLogger(__name__)
 
 
-# Create your views here.
-
 # Create a `login_request` view to handle sign in request
 @csrf_exempt
 def login_user(request):
-    # Get username and password from request.POST dictionary
-    data = json.loads(request.body)
-    username = data['userName']
-    password = data['password']
-    # Try to check if provide credential can be authenticated
-    user = authenticate(username=username, password=password)
-    response_data = {"userName": username}
-    if user is not None:
-        # If user is valid, call login method to login current user
-        login(request, user)
-        response_data = {"userName": username, "status": "Authenticated"}
-    return JsonResponse(response_data)
+    try:
+        data = json.loads(request.body)
+        username = data.get('userName')
+        password = data.get('password')
+        
+        user = authenticate(username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return JsonResponse({"userName": username, "status": "Authenticated"})
+        else:
+            return JsonResponse({"userName": username, "status": "Unauthorized", "error": "Invalid credentials"}, status=400)
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        return JsonResponse({"status": 500, "error": "Server error processing login"}, status=500)
 
 # Create a `logout_request` view to handle sign out request
 def logout_request(request):
@@ -47,37 +47,35 @@ def logout_request(request):
 # Create a `registration` view to handle sign up request
 @csrf_exempt
 def registration(request):
-    data = json.loads(request.body)
-    username = data['userName']
-    password = data['password']
-    first_name = data['firstName']
-    last_name = data['lastName']
-    email = data['email']
-    
-    username_exist = False
     try:
-        User.objects.get(username=username)
-        username_exist = True
-    except:
-        logger.debug("{} is new user".format(username))
+        data = json.loads(request.body)
+        username = data.get('userName')
+        password = data.get('password')
+        first_name = data.get('firstName', '')
+        last_name = data.get('lastName', '')
+        email = data.get('email', '')
+        
+        username_exist = User.objects.filter(username=username).exists()
 
-    if not username_exist:
-        user = User.objects.create_user(
-            username=username,
-            first_name=first_name,
-            last_name=last_name,
-            password=password,
-            email=email
-        )
-        login(request, user)
-        return JsonResponse({"userName": username, "status": "Authenticated"})
-    else:
-        return JsonResponse({"userName": username, "error": "Already Registered"})
+        if not username_exist:
+            user = User.objects.create_user(
+                username=username,
+                first_name=first_name,
+                last_name=last_name,
+                password=password,
+                email=email
+            )
+            login(request, user)
+            return JsonResponse({"userName": username, "status": "Authenticated"})
+        else:
+            return JsonResponse({"userName": username, "error": "Already Registered"})
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        return JsonResponse({"status": 500, "error": "Server error processing registration"}, status=500)
 
 # Get the list of cars
 def get_cars(request):
     count = CarMake.objects.filter().count()
-    print(count)
     if(count == 0):
         initiate()
     car_models = CarModel.objects.select_related('car_make')
@@ -87,7 +85,6 @@ def get_cars(request):
     return JsonResponse({"CarModels": cars})
 
 # Update the `get_dealerships` view to render the index page with a list of dealerships
-# Update the `get_dealerships` view
 def get_dealerships(request, state="All"):
     if state == "All":
         endpoint = "/fetchDealers"
